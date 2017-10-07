@@ -1,0 +1,145 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+"""
+Fragment kodu odpowiadający za rysowanie z plikow shp metodą lineTo
+
+Problemy:
+    - definicja koloru dla wojewodztw nie działa (jest nadpisywana przez rzeki), ale nie dotyczy to konturu Polski
+    - jak przechywcić miejsce kliknięcia myszą?
+"""
+
+from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel # QGridLayout, QLabel - do obsługi myszy
+from PyQt5.QtGui import QPainter, QPen, QPainterPath
+from PyQt5.QtCore import Qt
+import sys
+
+class Example(QWidget):
+    
+    def __init__(self,dane):
+        super().__init__()
+        self.punkty = dane
+        self.initUI()
+        
+        
+    def initUI(self):     
+
+        w = 900
+        h = 800
+        self.setGeometry(50, 50, w, h) #położenie okna poziom, pion, rozmiary okna poziom, pion
+        self.setWindowTitle('Walory v.1.0 by KP')
+        self.show()
+
+        
+        grid = QGridLayout()#od tąd sledzenie myszy
+        grid.setSpacing(10)
+        
+        x = 0
+        y = 0
+        
+        self.text = "x: {0},  y: {1}".format(x, y)
+        
+        self.label = QLabel(self.text, self)
+        grid.addWidget(self.label, 0, 0, Qt.AlignTop)
+        
+        self.setMouseTracking(False) #jesli true, to sledzi mysz nawet bez kliknięcia; jesli False to sledzi ruch z wcisniętym klawiszem (ale nie reaguje na kliknięcie) 
+        
+        self.setLayout(grid)
+        
+               
+    def paintEvent(self, e):
+
+        qp = QPainter()
+        qp.begin(self)
+        self.drawLines(qp)  #wywołanie rysowania lini
+        self.drawPoints(qp) #wywołanie rysowania miejscowosci
+        qp.end()
+        
+        
+    def drawLines(self, qp):
+        """
+        pomysł na dopasowywanie rozmiaru obrazu do rozmiaru okna:
+        size = self.size() #funkcja pobierająca rozmiar okna - do wykorzystania w innym miejscu
+        w = size.width()
+        h = size.height() # wartosc wysokosci okna (musi byc zgodna z podana w initUI)
+        """
+        h = 800
+        path = QPainterPath()
+        
+        ### rysowanie granicy kraju
+        pen = QPen(Qt.black, 3, Qt.SolidLine)
+        qp.setPen(pen)
+        #pętla rysująca kształt z shp - poligon, za pętlą instrukcja połączenia ostatniego punktu z pierwszym
+        path.moveTo(shap_pol[0].points[0][0]/1000,h-shap_pol[0].points[0][1]/1000)
+        for i in range (len(shap_pol[0].points)-1):
+            path.lineTo(shap_pol[0].points[i+1][0]/1000,h-shap_pol[0].points[i+1][1]/1000)
+        path.lineTo(shap_pol[0].points[0][0]/1000,h-shap_pol[0].points[0][1]/1000)
+        qp.drawPath(path)
+        
+     
+        ### rysowanie wojewodztw
+        pen = QPen(Qt.green, 1, Qt.SolidLine)
+        qp.setPen(pen)
+        #pętla rysująca kształty z shp - poligony, za pętlą instrukcja połączenia ostatniego punktu z pierwszym
+        for j in range (len(shap_woj)):
+            path.moveTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
+            for i in range (len(shap_woj[j].points)-1):
+                path.lineTo(shap_woj[j].points[i+1][0]/1000,h-shap_woj[j].points[i+1][1]/1000)
+            path.lineTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
+        qp.drawPath(path)
+        
+        
+        ### rysowanie rzek
+        
+        pen = QPen(Qt.blue, 1, Qt.SolidLine)#? zmiana koloru tutaj tez wpływa na poprzedniego shp? Dlaczego?
+        qp.setPen(pen)
+           
+        for j in range (len(shap_rzeki)):
+            path.moveTo(shap_rzeki[j].points[0][0]/1000,h-shap_rzeki[j].points[0][1]/1000)#ustawienie piora w pierwszym punkcie j-tego kształtu z pliku shp
+            for i in range (len(shap_rzeki[j].points)-1):
+                path.lineTo(shap_rzeki[j].points[i+1][0]/1000,h-shap_rzeki[j].points[i+1][1]/1000)
+        qp.drawPath(path)
+            
+        
+        ### rysowanie miast - jako elipsy
+        
+    def drawPoints(self, qp):
+        
+        h=800 # wartosc wysokosci okna (musi byc zgodna z podana w initUI)
+        
+        qp.setPen(Qt.red)
+             
+        for i in range(len(shap_miasta)): #pętla po liczbie miast
+            lon = (shap_miasta[i].points[0][0])/1000
+            lat = h-(shap_miasta[i].points[0][1])/1000
+            qp.drawEllipse(lon-2, lat-2, 5, 5) #rysuje okręgi o rozmiarze 5 i lewym gornym narozniku: wsp-2 (aby srodek byl tam gdzie miejscowosc) 
+     
+    def mouseMoveEvent(self, e): # sledzenie myszy
+        
+        x = e.x()
+        y = e.y()
+        
+        text = "x: {0},  y: {1}".format(x, y)
+        self.label.setText(text)
+    
+        
+import shapefile
+sf = shapefile.Reader("wojewodztwa1k_L")
+shap_woj = sf.shapes()
+
+sf = shapefile.Reader("Polska_92_4")
+shap_pol = sf.shapes()
+
+sf = shapefile.Reader("test_rzeki_2k_3L")
+shap_rzeki = sf.shapes()
+
+sf = shapefile.Reader("miasta_woj")
+shap_miasta = sf.shapes()
+
+        
+if __name__ == '__main__':
+
+   
+    app = QApplication(sys.argv)
+    ex = Example(shap_woj)
+    sys.exit(app.exec_())
