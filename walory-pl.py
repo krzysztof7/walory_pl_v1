@@ -27,7 +27,6 @@ Uwagi:
     (Shape do takiej zabawy na początku jest zbyt skomplikowany), 
     tzn. poszukać kontur Polski z województwami w SVG (to czysto tekstowy plik typu HTML) 
     i wyciągnąć z niego geometrię, a później wprowadzić ją do Matplotlib w adekwatnym dla niego formacie. 
-
 """
 
 # 1 Zdefiniowanie listy walorow ze wspołrzędnymi (zmienna walory_zestaw)
