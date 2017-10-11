@@ -5,8 +5,9 @@
 Fragment kodu odpowiadający za rysowanie z plikow shp metodą lineTo
 
 Problemy:
-    - definicja koloru dla wojewodztw nie działa (jest nadpisywana przez rzeki), ale nie dotyczy to konturu Polski
-    - jak przechywcić miejsce kliknięcia myszą?
+    - jak przekazać miejsce kliknięcia myszą do innych funkcji?
+    - jak ponownie wywołać rysowanie skoro już zostało zakończone?
+    - jak zorganizować całosć kodu?
 """
 
 from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel # QGridLayout, QLabel - do obsługi myszy
@@ -15,23 +16,22 @@ from PyQt5.QtCore import Qt
 import sys
 
 class Example(QWidget):
-    
+    # czy będzie dobrym pomysłem zdefiniowanie zmiennej klasowej tutaj (przed funkcjami) zawierającej informację o wymiarach okna (w i h)?
     def __init__(self,dane):
         super().__init__()
         self.punkty = dane
+        self.h = 800    #zdefiniowanie h i w jako zmiennych klasowych (wysokosc i szerokosc okna)
+        self.w = 900
         self.initUI()
-        
         
     def initUI(self):     
 
-        w = 900
-        h = 800
-        self.setGeometry(50, 50, w, h) #położenie okna poziom, pion, rozmiary okna poziom, pion
+        self.setGeometry(50, 50, self.w, self.h) #położenie okna poziom, pion, rozmiary okna poziom, pion
         self.setWindowTitle('Walory v.1.0 by KP')
         self.show()
 
         
-        grid = QGridLayout()#od tąd sledzenie myszy
+        grid = QGridLayout()#odtąd sledzenie myszy
         grid.setSpacing(10)
         
         x = 0
@@ -43,29 +43,66 @@ class Example(QWidget):
         grid.addWidget(self.label, 0, 0, Qt.AlignTop)
         
         self.setMouseTracking(False) #jesli true, to sledzi mysz nawet bez kliknięcia; jesli False to sledzi ruch z wcisniętym klawiszem (ale nie reaguje na kliknięcie) 
-        
+      #  self.mousePressEvent(False)  # dodałem testując metodę wyswietlenia wspołrzędnych kliknięcia
         self.setLayout(grid)
-        
+                
                
-    def paintEvent(self, e):
-
-        qp = QPainter()
-        qp.begin(self)
-        self.drawLines(qp)  #wywołanie rysowania lini
-        self.drawPoints(qp) #wywołanie rysowania miejscowosci
-        qp.end()
+    def paintEvent(self, e):    #funcja wywoływana automatycznie, odpowiada za całosć rysowania
+        
+        self.drawLines()  #wywołanie rysowania lini
+        self.drawPoints() #wywołanie rysowania miejscowosci
         
         
-    def drawLines(self, qp):
+    def drawLines(self):
         """
         pomysł na dopasowywanie rozmiaru obrazu do rozmiaru okna:
         size = self.size() #funkcja pobierająca rozmiar okna - do wykorzystania w innym miejscu
         w = size.width()
         h = size.height() # wartosc wysokosci okna (musi byc zgodna z podana w initUI)
+       
         """
-        h = 800
+        h = self.h # przypisanie wartosci zmiennej klasowej self.h do zmiennej funkcji h 
+       
+        ### rysowanie wojewodztw
+        #pętla rysująca kształty z shp - poligony, za pętlą instrukcja połączenia ostatniego punktu z pierwszym
+        
+        qp = QPainter() #przypisanie QPaintera do qp
+        qp.begin(self)  #rozpoczęcie QPaintera
+        
+        path = QPainterPath()   #rozpoczęcie sciezki
+        pen = QPen(Qt.black, 1, Qt.SolidLine) #zdefiniowanie stylu piora
+        qp.setPen(pen)          #ustanowienie piora ze stylem pen
+        
+        for j in range (len(shap_woj)): #pętla rysująca j kształtow ze zmiennej shap_woj (wczytanej niżej przez shapefile.Reader)
+            path.moveTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
+            for i in range (len(shap_woj[j].points)-1):
+                path.lineTo(shap_woj[j].points[i+1][0]/1000,h-shap_woj[j].points[i+1][1]/1000)
+            path.lineTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
+        
+        qp.drawPath(path)
+        qp.end()
+        
+        
+        ### rysowanie rzek
+        qp = QPainter()
+        qp.begin(self)
+      
+        path = QPainterPath()   
+        pen = QPen(Qt.blue, 2, Qt.SolidLine)#? zmiana koloru tutaj tez wpływa na poprzedniego shp? Dlaczego?
+        qp.setPen(pen)
+        
+        for j in range (len(shap_rzeki)):
+            path.moveTo(shap_rzeki[j].points[0][0]/1000,h-shap_rzeki[j].points[0][1]/1000)#ustawienie piora w pierwszym punkcie j-tego kształtu z pliku shp
+            for i in range (len(shap_rzeki[j].points)-1):
+                path.lineTo(shap_rzeki[j].points[i+1][0]/1000,h-shap_rzeki[j].points[i+1][1]/1000)
+        #path.closeSubpath()
+        qp.drawPath(path)
+       
+        qp = QPainter()
+        qp.begin(self)
         path = QPainterPath()
         
+                
         ### rysowanie granicy kraju
         pen = QPen(Qt.black, 3, Qt.SolidLine)
         qp.setPen(pen)
@@ -74,46 +111,31 @@ class Example(QWidget):
         for i in range (len(shap_pol[0].points)-1):
             path.lineTo(shap_pol[0].points[i+1][0]/1000,h-shap_pol[0].points[i+1][1]/1000)
         path.lineTo(shap_pol[0].points[0][0]/1000,h-shap_pol[0].points[0][1]/1000)
+
         qp.drawPath(path)
+        qp.end()
         
-     
-        ### rysowanie wojewodztw
-        pen = QPen(Qt.green, 1, Qt.SolidLine)
-        qp.setPen(pen)
-        #pętla rysująca kształty z shp - poligony, za pętlą instrukcja połączenia ostatniego punktu z pierwszym
-        for j in range (len(shap_woj)):
-            path.moveTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
-            for i in range (len(shap_woj[j].points)-1):
-                path.lineTo(shap_woj[j].points[i+1][0]/1000,h-shap_woj[j].points[i+1][1]/1000)
-            path.lineTo(shap_woj[j].points[0][0]/1000,h-shap_woj[j].points[0][1]/1000)
-        qp.drawPath(path)
-        
-        
-        ### rysowanie rzek
-        
-        pen = QPen(Qt.blue, 1, Qt.SolidLine)#? zmiana koloru tutaj tez wpływa na poprzedniego shp? Dlaczego?
-        qp.setPen(pen)
-           
-        for j in range (len(shap_rzeki)):
-            path.moveTo(shap_rzeki[j].points[0][0]/1000,h-shap_rzeki[j].points[0][1]/1000)#ustawienie piora w pierwszym punkcie j-tego kształtu z pliku shp
-            for i in range (len(shap_rzeki[j].points)-1):
-                path.lineTo(shap_rzeki[j].points[i+1][0]/1000,h-shap_rzeki[j].points[i+1][1]/1000)
-        qp.drawPath(path)
-            
         
         ### rysowanie miast - jako elipsy
+    def drawPoints(self):
         
-    def drawPoints(self, qp):
+        h = self.h # wartosc wysokosci okna (musi byc zgodna z podana w initUI)
         
-        h=800 # wartosc wysokosci okna (musi byc zgodna z podana w initUI)
+        qp = QPainter()
+        qp.begin(self)
         
-        qp.setPen(Qt.red)
-             
+        pen = QPen(Qt.red, 2, Qt.SolidLine)
+        qp.setPen(pen)
+        
         for i in range(len(shap_miasta)): #pętla po liczbie miast
             lon = (shap_miasta[i].points[0][0])/1000
             lat = h-(shap_miasta[i].points[0][1])/1000
             qp.drawEllipse(lon-2, lat-2, 5, 5) #rysuje okręgi o rozmiarze 5 i lewym gornym narozniku: wsp-2 (aby srodek byl tam gdzie miejscowosc) 
-     
+        
+        qp.end()
+ 
+    """  
+    #funkcja sledzaca ruch myszy - teraz juz zbędna, bo jest mousePressEvent
     def mouseMoveEvent(self, e): # sledzenie myszy
         
         x = e.x()
@@ -121,7 +143,28 @@ class Example(QWidget):
         
         text = "x: {0},  y: {1}".format(x, y)
         self.label.setText(text)
-    
+    """    
+    def mousePressEvent (self, ev):
+        """
+        funkcja pobierająca wspołrzędne kliknięcia i wyswietlająca je
+        """
+        if ev.button() == 1:
+            
+            x = ev.x()
+            y = ev.y()
+        
+            text = "x: {0},  y: {1}".format(x, y)
+            self.label.setText(text)
+        
+        qp = QPainter()
+        qp.begin(self)
+        
+        pen = QPen(Qt.red, 3, Qt.SolidLine)
+        qp.setPen(pen)
+        qp.drawEllipse(x,y,10,10)
+        qp.end()
+        
+        #clickCoorditanes = (x,y) #utworzenie tupli zawierającej wspołrzędne kliknięcia, aby je zwrcić poza funckę
         
 import shapefile
 sf = shapefile.Reader("wojewodztwa1k_L")
