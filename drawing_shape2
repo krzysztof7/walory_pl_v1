@@ -10,7 +10,7 @@ Problemy:
     - jak zorganizować całosć kodu?
 """
 
-from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel # QGridLayout, QLabel - do obsługi myszy
+from PyQt5.QtWidgets import QWidget, QApplication, QGridLayout, QLabel, QMessageBox # QGridLayout, QLabel - do obsługi myszy
 from PyQt5.QtGui import QPainter, QPen, QPainterPath
 from PyQt5.QtCore import Qt
 import sys
@@ -25,7 +25,8 @@ class Mapa(QWidget):
         
     def initUI(self):     
 
-        self.setGeometry(50, 50, self.w, self.h) #położenie okna poziom, pion, rozmiary okna poziom, pion
+        self.setGeometry(150, 150, self.w, self.h-120) #położenie okna poziom, pion, rozmiary okna poziom, pion
+                                                        #rozmiar okna w pionie zmiejszony o 130 - wspołrzędną NS Opołonka w PUWG1992, aby pod mapą miejsca nie zostawiać
         self.setWindowTitle('Walory v.1.0 by KP')
         self.show()
 
@@ -163,6 +164,20 @@ class Mapa(QWidget):
         qp.end()
         """
         #clickCoorditanes = (x,y) #utworzenie tupli zawierającej wspołrzędne kliknięcia, aby je zwrcić poza funckę
+        
+    def closeEvent(self, event):
+        """
+        funkcja dopytująca czy napewno zamknąć program po kliknięciu na x
+        #!!! Dodać do niej pytanie czy zapisać wyniki do pliku
+        """
+        reply = QMessageBox.question(self, 'Message',
+            "Are you sure to quit?", QMessageBox.Yes | 
+            QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            event.accept()
+        else:
+            event.ignore()   
         
 import shapefile
 sf = shapefile.Reader("wojewodztwa1k_L")
